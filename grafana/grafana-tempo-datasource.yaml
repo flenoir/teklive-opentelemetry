@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-tempo-datasource
+  namespace: monitoring
+type: Opaque
+stringData:
+  grafana-tempo-datasource.yaml: |-
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        orgId: 1
+        url: http://prometheus-kube-prometheus-prometheus:9090
+        uid: prometheus
+        basicAuth: false
+        isDefault: false
+        version: 1
+        editable: false
+        apiVersion: 1
+        jsonData:
+          httpMethod: GET
+          exemplarTraceIdDestinations:
+            - name: traceID
+              datasourceUid: tempo
+      - name: Tempo
+        type: tempo
+        access: proxy
+        orgId: 1
+        url: http://tempo:3100
+        basicAuth: false
+        isDefault: true
+        version: 1
+        editable: false
+        apiVersion: 1
+        uid: tempo
+        jsonData:
+          httpMethod: GET
+          tracesToMetrics:
+            datasourceUid: 'Prometheus'
+            tags: [{ key: 'service.name', value: 'service' }]
+            spanStartTimeShift: '-15m'
+            spanEndTimeShift: '15m'
+            queries:
+              - name: "Taux de requêtes"
+                query: "sum by (service)(rate(traces_spanmetrics_calls_total{$$__tags}[$$__rate_interval]))"
+              - name: "Taux d'erreurs"
+                query: "sum by (service) (rate(traces_spanmetrics_calls_total{$$__tags, status_code='STATUS_CODE_ERROR'}[$$__rate_interval]))"
+              - name: "Taux global d'erreurs sur l'ensemble de requêtes"
+                query: "sum by (service, status_code) (rate(traces_spanmetrics_calls_total{$$__tags}[$$__rate_interval]))"
+          tracesToLogs:
+            datasourceUid: 'Loki'
+            tags: ['job', 'instance', 'pod', 'namespace']
+            mappedTags: [{ key: 'service.name', value: 'service_name' }]
+            mapTagNamesEnabled: true
+            spanStartTimeShift: '-5m'
+            spanEndTimeShift: '5m'
+            filterByTraceID: true
+            filterBySpanID: false
+          serviceMap:
+            datasourceUid: 'prometheus'
+          nodeGraph:
+            enabled: true
+          lokiSearch:
+            datasourceUid: 'Loki'
+      - name: Loki
+        type: loki
+        access: proxy
+        orgId: 1
+        url: http://loki-loki-distributed-query-frontend.loki-distributed:3100
+        uid: loki
+        basicAuth: false
+        isDefault: false
+        version: 1
+        editable: false
+        apiVersion: 1
+        jsonData:
+          maxLines: 5000
+          derivedFields:
+            - datasourceUid: 'tempo'
+              matcherRegex: 'traceid":"([^"]*)"'
+              name: TraceID
+              url: '$${__value.raw}'
+           
+

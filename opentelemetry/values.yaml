@@ -1,0 +1,140 @@
+---
+mode: deployment
+
+#presets:
+#  logsCollection:
+#    enabled: true
+#    includeCollectorLogs: true
+
+config:
+  receivers:
+    prometheus:
+    zipkin:
+      endpoint: 0.0.0.0:9411
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+          cors:
+            allowed_origins:
+              - http://*
+              - https://*
+              - http://localhost:3000
+  exporters:
+    otlp/tempo:
+      endpoint: tempo:4317
+      tls:
+        insecure: true
+    logging:
+      loglevel: debug
+    prometheus:
+      endpoint: 0.0.0.0:9090
+      namespace: otel-metrics
+      enable_open_metrics: true
+      send_timestamps: true
+      resource_to_telemetry_conversion:
+        enabled: true
+    loki:
+      endpoint: http://loki-loki-distributed-distributor.loki-distributed:3100/loki/api/v1/push
+      tls:
+        insecure: true
+      headers:
+        "X-Custom-Header": "loki_rocks"
+  processors:
+    batch:
+      send_batch_size: 100
+      timeout: 200ms
+    memory_limiter:
+      limit_mib: 200
+      check_interval: 5s
+    span/statuscode:
+      include:
+        match_type: regexp
+        attributes: 
+          - Key: http.status_code
+            Value: "[3-5][0-9][0-9]"
+      status:
+        code: "Error"
+    tail_sampling:
+      decision_wait: 10s
+      num_traces: 100
+      expected_new_traces_per_sec: 10
+      policies:
+        [
+          {
+            name: health and metrics endpoints policy,
+            type: string_attribute,
+            string_attribute: {key: http.url, values: [\/health, \/metrics], enabled_regex_matching: true, invert_match: true}
+          }
+        ]
+    attributes:
+      actions:
+        - action: insert
+          key: event_domain
+          from_attribute: event.domain
+        - action: insert
+          key: loki.attribute.labels
+          value: event_domain
+    resource:
+      attributes:
+        - action: insert
+          key: service_name
+          from_attribute: service.name
+        - action: insert
+          key: service_namespace
+          from_attribute: service.namespace
+        - action: insert
+          key: loki.resource.labels
+          value: service_name, service_namespace
+  extensions:
+    health_check: {}
+    memory_ballast:
+      size_in_percentage: 20
+  service:
+    telemetry:
+      logs:
+        level: "debug"
+    extensions: [health_check, memory_ballast]
+    pipelines:
+      traces:
+        receivers: [otlp, zipkin]
+        processors: [memory_limiter, batch, span/statuscode]
+        exporters: [otlp/tempo]
+      metrics:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [prometheus, logging]
+      logs:
+        receivers: [otlp]
+        processors: [resource, attributes, batch]
+        exporters: [logging, loki]
+
+ports:
+  zipkin:
+    enabled: true
+  metrics:
+    enabled: true
+    containerPort: 9090
+    servicePort: 9090
+    protocol: TCP
+
+serviceMonitor:
+  enabled: true
+  metricsEndpoints:
+  - port: metrics
+    # interval: 15s
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+#command:
+#  name: otelcol-contrib
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1G

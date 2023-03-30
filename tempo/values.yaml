@@ -1,0 +1,120 @@
+# traces:
+#   jaeger:
+#     thriftHttp:
+#       enabled: true
+---
+traces:
+  otlp:
+    http:
+      enabled: true
+    grpc:
+      enabled: true
+
+metricsGenerator:
+  enabled: true
+  extraEnv:
+    - name: MY_POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+  extraArgs:
+    - -config.expand-env=true          
+  config:
+    processor:
+      service_graphs:
+        max_items: 30000
+        dimensions:
+          - cloud.provider
+          - deployment.environment
+          - cadre
+          - service.namespace
+          - environnement
+          - equipe.nom
+      span_metrics:
+        dimensions:
+          - cloud.provider
+          - deployment.environment
+          - cadre
+          - service.namespace
+          - environnement
+          - equipe.nom
+    storage:
+      path: /var/tempo/wal
+      remote_write : 
+        - url: http://prometheus-kube-prometheus-prometheus:9090/api/v1/write
+
+minio:
+  enabled: true
+
+tempo:
+  resources:
+      limits: 
+         cpu: 500m
+         memory: 1Gi
+      requests:
+         cpu: 100m
+         memory: 128Mi
+
+config: |
+  metrics_generator_enabled: true
+  search_enabled: true
+  ingester:
+    lifecycler:
+        ring:
+            replication_factor: 1
+    flush_check_period: 10s
+    trace_idle_period: 10s        # the length of time after a trace has not received spans to consider it complete and flush it
+    max_block_duration: 5m        #  this much time passes
+  server:
+    http_listen_port: 3100
+    log_level: info
+    grpc_server_max_recv_msg_size: 4.194304e+06
+    grpc_server_max_send_msg_size: 4.194304e+06
+  overrides:
+    max_search_bytes_per_trace: 50000
+    max_bytes_per_trace: 0
+    metrics_generator_processors:
+       - service-graphs
+       - span-metrics
+  query_frontend:
+    search:
+      max_duration: 3h1m0s
+  compactor:
+    compaction:
+      compaction_window: 30m
+  storage:
+    trace:
+      cache: none
+      backend: s3
+      s3:
+        bucket: toto
+        endpoint: minio:9000
+        access_key: mykey
+        secret_key:  mysecret
+        insecure: true
+      blocklist_poll: 5m
+      wal:
+        path: /var/tempo/wal
+  metrics_generator:
+    storage:
+      path: /var/tempo/wal
+      remote_write : 
+        - url: http://prometheus-kube-prometheus-prometheus:9090/api/v1/write
+    processor:
+      service_graphs:
+        max_items: 30000
+        dimensions:
+          - cloud.provider
+          - deployment.environment
+          - cadre
+          - service.namespace
+          - environnement
+          - equipe.nom
+      span_metrics:
+        dimensions:
+          - cloud.provider
+          - deployment.environment
+          - cadre
+          - service.namespace
+          - environnement
+          - equipe.nom

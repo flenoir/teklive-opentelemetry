@@ -1,0 +1,69 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spring-petclinic
+  # labels for AppDyn Instru
+  # labels:
+  #   appdyn-appName: POC_TEMPO_test_ti_tempo
+  #   appdyn-autoInstru: javaQuarkus
+spec:
+  selector:
+    matchLabels:
+      app: spring-petclinic
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: spring-petclinic
+        component: "petclinic"
+        cadre: "y"
+      # annotations for Otel Instru
+      annotations:
+      #   sidecar.opentelemetry.io/inject: "true"
+        instrumentation.opentelemetry.io/inject-java: "monitoring/ti-tempo-instrumentation"
+    spec:
+      containers:
+      - name: app
+        image: ghcr.io/pavolloffay/spring-petclinic:latest
+        imagePullPolicy: Never
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: petclinic-svc
+  labels:
+    app: spring-petclinic                                                                                                                                                                                              
+spec:
+  ports:
+  - name: petclinic-port
+    port: 8080
+    targetPort: 8080
+  selector:
+    app: spring-petclinic    # doit matcher avec spec.label du deploiement
+
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: "petclinic-ingress"
+#   annotations:
+#     kubernetes.io/ingress.class: "traefik"
+#     cert-manager.io/cluster-issuer: certificat-ingress-issuer
+# spec:
+#   rules:
+#     - host: "ti-petclinic.sandbox-base.k8s.pole-emploi.intra"
+#       http:
+#         paths:
+#           - backend:
+#               service:
+#                 name: petclinic-svc
+#                 port:
+#                   name: petclinic-port
+#             path: /
+#             pathType: ImplementationSpecific
+#   tls:
+#     - hosts:
+#       - "ti-petclinic.sandbox-base.k8s.pole-emploi.intra"
+#       secretName: cert-petclinic-sandbox                                                                                                                                                                                          

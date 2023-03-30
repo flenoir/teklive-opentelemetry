@@ -1,0 +1,89 @@
+---
+global:
+  dnsService: kube-dns.kube-system.svc.cluster.local.
+
+storage:
+  bucketNames:
+    chunks: chunks
+    ruler: ruler
+    admin: admin
+  type: s3
+  s3:
+    bucket: toto
+    endpoint: minio:9000
+    access_key: mykey
+    secret_key:  mysecret
+    insecure: true
+  filesystem:
+    directory: /var/loki/chunks
+  boltdb_shipper:
+    active_index_directory: /var/loki/index
+    shared_store: aws
+    cache_location: /var/loki/cache
+    cache_ttl: 2h
+
+loki:
+  # -- The SecurityContext for Loki containers
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    allowPrivilegeEscalation: false
+
+
+ingester:
+  extraEnv:
+  - name: MY_POD_IP
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIP
+  extraArgs:
+    - -memberlist.bind-addr=$(MY_POD_IP)
+
+distributor:
+  extraEnv:
+  - name: MY_POD_IP
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIP
+  extraArgs:
+    - -memberlist.bind-addr=$(MY_POD_IP)
+
+querier:
+  extraEnv:
+  - name: MY_POD_IP
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIP
+  extraArgs:
+    - -memberlist.bind-addr=$(MY_POD_IP)
+
+
+write:
+  extraEnv:
+  - name: MY_POD_IP
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIP
+  extraArgs:
+    - -memberlist.bind-addr=$(MY_POD_IP)
+
+read:
+  extraEnv:
+  - name: MY_POD_IP
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIP
+  extraArgs:
+    - -memberlist.bind-addr=$(MY_POD_IP)
+
+backend:
+  extraEnv:
+  - name: MY_POD_IP
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIP
+  extraArgs:
+    - -memberlist.bind-addr=$(MY_POD_IP)
+...

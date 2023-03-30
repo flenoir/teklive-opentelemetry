@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-ini
+  namespace: monitoring
+data:
+  grafana.ini: |
+    [feature_toggles]
+    enable = tempoSearch tempoBackendSearch tempoServiceGraph tempoApmTable traceToMetrics dashboardPreviews traceqlEditor
